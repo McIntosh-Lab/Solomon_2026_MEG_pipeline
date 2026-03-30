@@ -31,7 +31,7 @@ os.environ['OMP_NUM_THREADS'] = num_cpu
 ### FILE I/O ###
 
 # Get paths to files
-data_dir = os.path.abspath('/home/jsolomon/scratch/cam-can/tvb-ccmeg/_Data')  # Parent directory
+data_dir = os.path.abspath('./_Data')  # Parent directory
 
 # Identify calibration and cross-talk files (important for Maxwell filtering)
 calibration = os.path.join(os.path.abspath('.'), 'tvb-ccmeg/sss_params/sss_cal.dat')
@@ -51,7 +51,7 @@ trans = os.path.join(trans_dname, subject + '-trans.fif')
 fs_dir = os.path.join(data_dir,'mri/freesurfer')
 
 # We want to save output at various points in the pipeline
-output_dir = os.path.join('./_Data', 'processed_meg', subject)
+output_dir = os.path.join(data_dir, 'processed_meg', subject)
 if not os.path.isdir(output_dir):
 	os.mkdir(output_dir)
 
