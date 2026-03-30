@@ -4,9 +4,9 @@
 #
 # Description: Script to test pipeline for TVB Cam-CAN MEG
 #
-# Author: Simon Dobri <simon_dobri@sfu.ca>
+# Authors: Simon Dobri <simon_dobri@sfu.ca> & Jack Solomon <jack_solomon@sfu.ca> $ Santiago Flores <santiago_flores_alonso@sfu.ca>
 #
-# License: Apache 2.0
+# License: BSD (3-clause)
 
 import mne              # Need MNE Python
 import preprocess       # Module with all the preprocessing functions
@@ -28,8 +28,10 @@ else:
 num_cpu = '16'
 os.environ['OMP_NUM_THREADS'] = num_cpu
 
+### FILE I/O ###
+
 # Get paths to files
-data_dir = os.path.abspath('./_Data')  # Parent directory
+data_dir = os.path.abspath('/home/jsolomon/scratch/cam-can/tvb-ccmeg/_Data')  # Parent directory
 
 # Identify calibration and cross-talk files (important for Maxwell filtering)
 calibration = os.path.join(os.path.abspath('.'), 'tvb-ccmeg/sss_params/sss_cal.dat')
@@ -39,9 +41,9 @@ cross_talk = os.path.join(os.path.abspath('.'), 'tvb-ccmeg/sss_params/ct_sparse.
 # Raw data should be in a directory called 'meg' with the same parent directory as the pipeline code
 
 meg_dir = os.path.join(data_dir, 'meg')  # Directory containing MEG data
-rest_raw_dname = os.path.join(meg_dir, 'release005/BIDSsep/derivatives_rest/aa/AA_nomovecomp/aamod_meg_maxfilt_00001')
-er_dname = os.path.join(meg_dir, 'release004/BIDS_20190411/meg_emptyroom')
-trans_dname = os.path.join(meg_dir, 'camcan_coreg/trans')
+rest_raw_dname = os.path.join(meg_dir, 'meg_restingstate')
+er_dname = os.path.join(meg_dir, 'meg_emptyroom')
+trans_dname = os.path.join(meg_dir, 'camcan_coreg')
 raw_fname = os.path.join(rest_raw_dname, subject, 'mf2pt2_' + subject + '_ses-rest_task-rest_meg.fif')
 er_fname = os.path.join(er_dname, subject, 'emptyroom/emptyroom_' + subject[4:] + '.fif')
 trans = os.path.join(trans_dname, subject + '-trans.fif')
@@ -49,22 +51,40 @@ trans = os.path.join(trans_dname, subject + '-trans.fif')
 fs_dir = os.path.join(data_dir,'mri/freesurfer')
 
 # We want to save output at various points in the pipeline
-output_dir = os.path.join(data_dir, 'processed_meg', subject)
+output_dir = os.path.join('./_Data', 'processed_meg', subject)
 if not os.path.isdir(output_dir):
 	os.mkdir(output_dir)
 
-# Set ECG / EOG correction method (options are ICA and SSP, setting ICA to False uses SSP)
+### USER DEFINED VARIABLES ###
 
-ICA = False
+# Set ECG / EOG correction method (options are ICA and SSP, setting ICA to False uses SSP)
+ICA = True
 
 # Pick either volumetric or surface mesh beamformers (setting Vol to False uses surface mesh)
-
 Vol = False
+
+# Downsample boolean and default downsample factor
+downsamp = True
+downsamp_factor = 2
+
+# Define frequncy bans of interest
+bands = {
+	'delta': (1, 4),
+	'theta': (4, 7),
+	'alpha': (8, 12),
+	'beta': (15, 29),
+	'g_low': (30, 59),
+	'g_high': (60, 90)
+}
+
+### RUN PIPELINE ###
 
 # Read resting-state data
 raw = preprocess.read_data(raw_fname)
 raw.crop(tmin=30, tmax=390)
 raw.del_proj()                          # Don't want existing projectors, could add to preprocess.read_data() if we never want them
+
+# Select channels for analysis
 if ICA:
 	raw.pick(['meg', 'eog', 'ecg'])
 else:
@@ -75,6 +95,12 @@ l_freq = 1.0    # High pass frequency in Hz
 h_freq = 90     # Low pass frequency in Hz
 raw = preprocess.filter_data(raw,l_freq=l_freq,h_freq=h_freq)
 
+# Define epochs based on heartbeat artifacts
+ecg_epochs = mne.preprocessing.create_ecg_epochs(raw)
+
+# Define epochs based on ocular artifacts
+eog_epochs = mne.preprocessing.create_eog_epochs(raw)
+
 # Remove heartbeat and eye movement artifacts
 if ICA:
 	pick_meg = mne.pick_types(raw.info, meg=True, eeg=False, stim=False, ref_meg=False)
@@ -84,12 +110,23 @@ else:
 	raw = preprocess.add_eog_projectors(raw)
 
 # Downsample raw data to speed up computation
-new_sfreq = 500
-raw.resample(new_sfreq)
+sfreq = raw.info['sfreq']
+
+if downsamp:
+	sfreq = int(sfreq / downsamp_factor)
+	raw.resample(sfreq)
 
 # Save processed Raw data
 
 raw.save(os.path.join(output_dir, 'sensor_processed_meg.fif'), overwrite=True)
+
+# Calculate normalized PSD
+n_fft=1000
+if downsamp:
+	n_fft = int(n_fft/downsamp_factor)
+sensor_ts_PSD, sensor_PSD_freq, sensor_power_bands = compute_source.PSD_per_timeseries(raw._data, bands, sfreq = sfreq, h_freq = h_freq, n_fft = n_fft)
+np.save(os.path.join(output_dir, 'sensor_PSD'), sensor_ts_PSD)
+np.save(os.path.join(output_dir, 'PSD_freq'), sensor_PSD_freq)
 
 # Compute data covariance from two minutes of raw recording
 if ICA:
@@ -101,7 +138,7 @@ data_cov = mne.compute_raw_covariance(raw, tmin=30, tmax=150)
 er_raw = preprocess.read_data(er_fname)
 er_raw.del_proj()
 if ICA:
-	er_raw.pick(['meg'])	# I realize that this doesn' make sense but I need the mags for the ICA
+	er_raw.pick(['meg'])
 else:
 	er_raw.pick(['grad'])
 
@@ -112,7 +149,7 @@ else:
 	er_raw.add_proj(raw.info['projs'])
 	er_raw.apply_proj()
 
-er_raw.resample(new_sfreq)
+# er_raw.resample(new_sfreq)
 if ICA:
 	er_raw.pick(['grad'])
 
@@ -137,12 +174,17 @@ src.save(os.path.join(output_dir, 'src_beamformer-src.fif'), overwrite=True)
 # Compute the spatial filter
 filts = mne.beamformer.make_lcmv(raw.info, fwd, data_cov, reg=0.05, noise_cov=None, pick_ori='max-power', weight_norm='unit-noise-gain', rank='info')
 
-# pick_ori=None, weight_norm=None, depth=None, rank=None) #Vasily's settings
-
 # Apply beamformer
-start, stop = raw.time_as_index([30, 390])
+start, stop = raw.time_as_index([0, 390])
 stc = mne.beamformer.apply_lcmv_raw(raw, filts, start=start, stop=stop)
 stc.save(os.path.join(output_dir, 'stc_beamformer'), overwrite=True)
 
 # Parcellate_Source_Data
-compute_source.parcellate_source_data(src, stc, subject, fs_dir, output_dir, Vol)
+labels_aparc, labels_schaefer, parc_ts_aparc, parc_ts_schaefer = compute_source.parcellate_source_data(src, stc, subject, fs_dir, output_dir, Vol, mode = 'pca_flip')
+
+# Calculate Source PSD
+aparc_ts_PSD, source_PSD_freq, aparc_power_bands = compute_source.PSD_per_timeseries(parc_ts_aparc, bands, sfreq = sfreq, h_freq = h_freq, n_fft = n_fft)
+schaefer_ts_PSD, source_PSD_freq, schaefer_power_bands = compute_source.PSD_per_timeseries(parc_ts_schaefer, bands, sfreq = sfreq, h_freq = h_freq, n_fft = n_fft)
+np.save(os.path.join(output_dir, 'parc_ts_beamformer_aparc_PSD'), aparc_ts_PSD)
+np.save(os.path.join(output_dir, 'parc_ts_beamformer_schaefer_PSD'), schaefer_ts_PSD)
+np.save(os.path.join(output_dir, 'source_PSD_freq'), source_PSD_freq)
