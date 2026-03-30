@@ -1,6 +1,6 @@
 # Cam_CAN_MEG_Resting_State_Pipeline
 
-This repository contains a pipeline to clean and create source localized data for the resting state Cam-CAN MEG dataset. This pipeline was created by Dr. Simon Dobri and developed by Dr. Simon Dobri and Dr. Jack Solomon for his 2026 article, titled "Interactions between age and sex in multiscale entropy and spectral power changes across the lifespan".
+This repository contains a pipeline to clean and create source localized data for the resting state Cam-CAN MEG dataset. This pipeline was created by Dr. Simon Dobri and developed by Dr. Jack Solomon for his 2026 article, titled "Interactions between age and sex in multiscale entropy and spectral power changes across the lifespan".
 
 ## Repository Outline
 
@@ -14,7 +14,7 @@ This repository contains code that:
 
 The dependencies for this analysis are as follows. 
 
-Freesurfer version XXX
+- freesurfer (latest)
 
 - mne python (latest)
   - If using the fir preinstalled mne wheel the additional dependencies are:
@@ -22,7 +22,7 @@ Freesurfer version XXX
     - sklearn (latest)
     - python-picard (latest)
 
-The scripts were run in python 3.11.4 for publication. They may work with other versions of python but are not guaranteed to function correctly.
+The scripts were run in python 3.11.4 and use freesurfer 7.4.1 for publication. They may work with other versions of python but are not guaranteed to function correctly.
 
 ## Raw data
 
@@ -32,18 +32,20 @@ After running the git clone command, `cd` into the cloned directory. All command
 
 To replicate the results of solomon et al. (2026). You will need:
   - The raw resting state MEG data for each participant from release 005 with only a maxfilter applied (i.e. without movement compensation)
-    - the subject directories should be places in a new directory `./_Data/meg/meg_restingstate/` 
+    - the subject directories should be places in a new directory `./Solomon_2026_MEG_pipeline/_Data/meg/meg_restingstate/` 
   - The emptyroom recordings for each participant
-    - the subject directories should be places in a new directory `./_Data/meg/meg_emptyroom/` 
+    - the subject directories should be places in a new directory `./Solomon_2026_MEG_pipeline/_Data/meg/meg_emptyroom/` 
   - the MEG registration files for each participant
-    - the subject directories should be places in a new directory `./_Data/meg/camcan_coreg/` 
+    - the subject directories should be places in a new directory `./Solomon_2026_MEG_pipeline/_Data/meg/camcan_coreg/` 
     - the transformation files were provided by [Bardouille et al. 2019](https://www.sciencedirect.com/science/article/pii/S1053811919301612?via%3Dihub)
   - the raw structural MRI files for each participant
-    - the subject directories should be places in a new directory `./_Data/mri/`
+    - the subject directories should be places in a new directory `./Solomon_2026_MEG_pipeline/_Data/mri/`
 
-## Running the FreeSurfer pipeline
+## Code Usage
 
 The experiment's code is formatted for use on the [Digital Research Alliance of Canada](https://www.alliancecan.ca/en) Fir cluster and will need to be adapted for local processing.
+
+## Running the FreeSurfer pipeline
 
 To run the FreeSurfer pipeline use the following code blocks:
 
